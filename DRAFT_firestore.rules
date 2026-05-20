@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 3. Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 2. Entity Validations
+    function isValidUser(data) {
+      return data.uid is string && data.uid == request.auth.uid
+        && data.displayName is string && data.displayName.size() >= 2 && data.displayName.size() <= 50
+        && data.email is string && data.email.size() >= 5 && data.email.size() <= 100
+        && (!data.keys().contains('bio') || (data.bio is string && data.bio.size() <= 160))
+        && (!data.keys().contains('photoURL') || (data.photoURL is string && data.photoURL.size() <= 2000))
+        && (!data.keys().contains('followersCount') || data.followersCount is number)
+        && (!data.keys().contains('followingCount') || data.followingCount is number);
+    }
+
+    function isValidPost(data) {
+      return data.id is string && data.id.size() > 0
+        && data.userId is string && data.userId == request.auth.uid
+        && data.mediaUrl is string && data.mediaUrl.size() > 0 && data.mediaUrl.size() <= 2000
+        && data.type is string && (data.type == 'photo' || data.type == 'reel')
+        && data.likesCount is number && data.likesCount >= 0
+        && data.commentsCount is number && data.commentsCount >= 0
+        && (!data.keys().contains('caption') || (data.caption is string && data.caption.size() <= 2200))
+        && (!data.keys().contains('displayName') || (data.displayName is string && data.displayName.size() <= 50))
+        && (!data.keys().contains('userPhotoURL') || (data.userPhotoURL is string && data.userPhotoURL.size() <= 2000));
+    }
+
+    function isValidComment(data) {
+      return data.id is string
+        && data.postId is string && data.postId.size() > 0
+        && data.userId is string && data.userId == request.auth.uid
+        && data.text is string && data.text.size() > 0 && data.text.size() <= 1000
+        && data.displayName is string
+        && (!data.keys().contains('userPhotoURL') || data.userPhotoURL is string);
+    }
+
+    function isValidLike(data) {
+      return data.id is string
+        && data.postId is string
+        && data.userId is string && data.userId == request.auth.uid;
+    }
+
+    function isValidFollow(data) {
+      return data.id is string
+        && data.followerId is string && data.followerId == request.auth.uid
+        && data.followingId is string && data.followingId.size() > 0;
+    }
+
+    // 4. Collection Matches
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId);
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isOwner(userId) && isValidId(userId) && isValidUser(incoming());
+      allow update: if isSignedIn() && isOwner(userId) && isValidId(userId) && isValidUser(incoming())
+                       && incoming().uid == existing().uid
+                       && incoming().email == existing().email;
+    }
+
+    match /posts/{postId} {
+      allow get, list: if isSignedIn() && isValidId(postId);
+      allow create: if isSignedIn() && isValidId(postId) && isValidPost(incoming());
+      allow update: if isSignedIn() && isValidId(postId) && (
+        // Action A: Edit own post
+        (isOwner(existing().userId) && isValidPost(incoming()) && incoming().createdAt == existing().createdAt) ||
+        // Action B: Social stats increment (likes/comments Count) from commenters/likers
+        (incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'commentsCount']) && incoming().createdAt == existing().createdAt && incoming().userId == existing().userId)
+      );
+      allow delete: if isSignedIn() && isValidId(postId) && isOwner(existing().userId);
+
+      // Sub-collections matching
+      match /comments/{commentId} {
+        allow get, list: if isSignedIn() && isValidId(commentId);
+        allow create: if isSignedIn() && isValidId(commentId) && isValidComment(incoming());
+        allow delete: if isSignedIn() && isValidId(commentId) && (isOwner(existing().userId) || isOwner(get(/databases/$(database)/documents/posts/$(postId)).data.userId));
+      }
+
+      match /likes/{likeId} {
+        allow get, list: if isSignedIn() && isValidId(likeId);
+        allow create: if isSignedIn() && isOwner(likeId) && isValidId(likeId) && isValidLike(incoming());
+        allow delete: if isSignedIn() && isOwner(likeId) && isValidId(likeId);
+      }
+    }
+
+    match /follows/{followId} {
+      allow get, list: if isSignedIn() && isValidId(followId);
+      allow create: if isSignedIn() && isValidId(followId) && isValidFollow(incoming());
+      allow delete: if isSignedIn() && isValidId(followId) && (isOwner(existing().followerId));
+    }
+  }
+}

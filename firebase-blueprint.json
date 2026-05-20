@@ -1,0 +1,99 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile database document containing username, bio, and counts.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "bio": { "type": "string" },
+        "followersCount": { "type": "number" },
+        "followingCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "email", "createdAt"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "A user-uploaded post or reel containing image/video, caption, and aggregated stats.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "userPhotoURL": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "caption": { "type": "string" },
+        "type": { "type": "string", "enum": ["photo", "reel"] },
+        "likesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "mediaUrl", "type", "likesCount", "commentsCount", "createdAt"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A comment left on a user post.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "postId": { "type": "string" },
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "userPhotoURL": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "postId", "userId", "displayName", "text", "createdAt"]
+    },
+    "Like": {
+      "title": "Like",
+      "description": "A record logging a user's like on a post, used to prevent duplicate likes.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "postId": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "postId", "userId", "createdAt"]
+    },
+    "Follow": {
+      "title": "Follow",
+      "description": "A follower-following relationship link.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "followerId": { "type": "string" },
+        "followingId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "followerId", "followingId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Root collection for user profiles"
+    },
+    "posts/{postId}": {
+      "schema": "Post",
+      "description": "Root collection for photos and video reel posts"
+    },
+    "posts/{postId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Sub-collection of comments on each post"
+    },
+    "posts/{postId}/likes/{likeId}": {
+      "schema": "Like",
+      "description": "Sub-collection of likes on each post to authenticate writes"
+    },
+    "follows/{followId}": {
+      "schema": "Follow",
+      "description": "Root collection representing user follow structures"
+    }
+  }
+}

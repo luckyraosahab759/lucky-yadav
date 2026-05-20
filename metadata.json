@@ -1,0 +1,6 @@
+{
+  "name": "Social Media Mobile App",
+  "description": "A full-stack social media app with customizable profiles, follow systems, interactive photos, video reel feeds, comments, and full dark-theme mobile UI.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
